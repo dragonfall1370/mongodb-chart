@@ -32,9 +32,13 @@ spec:
 
       containers:
         - name: mongodb
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: 
           args:
             - "--bind_ip_all"
             - "--replSet={{ .Values.replicaSet.name }}"
