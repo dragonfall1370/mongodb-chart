@@ -42,13 +42,11 @@ spec:
           args:
             - |
               set -euo pipefail
-              install -m 400 -o 999 -g 999 /secret/keyfile /work/keyfile
+              install -m 400 -o 999 -g 999 /secret/keyfile 
           volumeMounts:
             - name: keyfile-secret
               mountPath: /secret
               readOnly: true
-            - name: keydir
-              mountPath: /work
             - name: tmp
               mountPath: /tmp
 
