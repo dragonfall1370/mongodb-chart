@@ -23,7 +23,7 @@ spec:
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
         # BasePath is "templates", so don't repeat "templates/" again:
-        checksum/auth-secret: {{ include (print $.Template.BasePath "/secret-auth.yaml") . | sha256sum }}
+        # checksum/auth-secret: {{ include (print $.Template.BasePath "/secret-auth.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "mongodb-chart.serviceAccountName" . }}
       securityContext:
