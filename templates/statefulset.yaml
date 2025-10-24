@@ -55,6 +55,9 @@ spec:
               mountPath: /data/db
             - name: configdir
               mountPath: /data/configdb
+            - name: keyfile
+              mountPath: /data/configdb/keyfile
+              subPath: keyfile
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
@@ -100,3 +103,10 @@ spec:
         - name: datadir
           emptyDir: {}
         {{- end }}
+        - name: keyfile
+          secret:
+            secretName: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+            items:
+            - key: KEYFILE_CONTENT
+                path: keyfile
+            defaultMode: 0440
