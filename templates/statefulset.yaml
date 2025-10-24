@@ -42,11 +42,16 @@ spec:
           args:
             - |
               set -euo pipefail
-              install -m 400 -o 999 -g 999 /secret/keyfile 
+              # copy from secret -> writable emptyDir, then fix ownership & perms
+              cp /secret/keyfile /work/keyfile
+              chown 999:999 /work/keyfile
+              chmod 400 /work/keyfile
           volumeMounts:
             - name: keyfile-secret
               mountPath: /secret
               readOnly: true
+            - name: keydir
+              mountPath: /work
             - name: tmp
               mountPath: /tmp
 
@@ -114,4 +119,6 @@ spec:
                 path: keyfile
             defaultMode: 0400
         - name: tmp
+          emptyDir: {}
+        - name: keydir
           emptyDir: {}
