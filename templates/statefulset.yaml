@@ -32,11 +32,6 @@ spec:
 
       containers:
         - name: mongodb
-          securityContext:
-            runAsUser: 999
-            runAsGroup: 999
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
@@ -69,8 +64,8 @@ spec:
             - name: tmp
               mountPath: /tmp
           securityContext:
-            runAsUser: 0
-            runAsGroup: 0
+            runAsUser: 999
+            runAsGroup: 999
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
           readinessProbe:
