@@ -108,5 +108,5 @@ spec:
             secretName: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
             items:
             - key: KEYFILE_CONTENT
-                path: keyfile
+              path: keyfile
             defaultMode: 0440
