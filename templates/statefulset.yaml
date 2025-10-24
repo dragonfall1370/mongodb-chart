@@ -82,7 +82,7 @@ spec:
               mountPath: /data/db
             - name: configdir
               mountPath: /data/configdb
-            - name: keyfile-secret
+            - name: keydir
               mountPath: /etc/mongo-keyfile
               readOnly: true
             - name: tmp
