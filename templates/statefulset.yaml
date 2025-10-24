@@ -16,60 +16,60 @@ spec:
     type: RollingUpdate
   template:
     metadata:
-        annotations:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+        app.kubernetes.io/component: database
+      annotations:
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- if and .Values.auth.enabled (not .Values.auth.existingSecret) }}
+        checksum/auth-secret: {{ (printf "%s|%s|%s" .Values.auth.rootUser .Values.auth.rootPassword .Values.auth.keyFile) | sha256sum }}
+        {{- end }}
     spec:
-        serviceAccountName: {{ include "mongodb-chart.serviceAccountName" . }}
+      serviceAccountName: {{ include "mongodb-chart.serviceAccountName" . }}
 
-        # You can keep or remove pod-level securityContext;
-        # it'll be overridden for the mongodb container below.
-        securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 6 }}
-
-        # --- REMOVE initContainers completely ---
-
-        containers:
+      containers:
         - name: mongodb
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            imagePullPolicy: {{ .Values.image.pullPolicy }}
-            command: ["mongod"]
-            args:
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["mongod"]
+          args:
             - "--bind_ip_all"
             - "--replSet={{ .Values.replicaSet.name }}"
             - "--auth"
             - "--keyFile=/etc/mongo-keyfile/keyfile"
-            env:
+          env:
             - name: MONGO_INITDB_ROOT_USERNAME
-                valueFrom:
+              valueFrom:
                 secretKeyRef:
-                    name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
-                    key: MONGODB_ROOT_USER
+                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+                  key: MONGODB_ROOT_USER
             - name: MONGO_INITDB_ROOT_PASSWORD
-                valueFrom:
+              valueFrom:
                 secretKeyRef:
-                    name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
-                    key: MONGODB_ROOT_PASSWORD
-            ports:
+                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+                  key: MONGODB_ROOT_PASSWORD
+          ports:
             - name: mongodb
-                containerPort: 27017
-            volumeMounts:
+              containerPort: 27017
+          volumeMounts:
             - name: datadir
-                mountPath: /data/db
+              mountPath: /data/db
             - name: configdir
-                mountPath: /data/configdb
+              mountPath: /data/configdb
             - name: keyfile-secret
-                mountPath: /etc/mongo-keyfile    # mount the secret as a dir
-                readOnly: true
-            securityContext:                     # override to run as root (dev-only)
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+          securityContext:
             runAsUser: 0
             runAsGroup: 0
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
-            readinessProbe:
+          readinessProbe:
             exec:
-                command:
+              command:
                 - /bin/sh
                 - -c
                 - mongo --quiet --eval 'db.adminCommand("ping")' || mongosh --quiet --eval 'db.adminCommand("ping")'
@@ -78,17 +78,17 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 6
 
-        volumes:
+      volumes:
         - name: configdir
-            emptyDir: {}
+          emptyDir: {}
         {{- if not .Values.persistence.enabled }}
         - name: datadir
-            emptyDir: {}
+          emptyDir: {}
         {{- end }}
         - name: keyfile-secret
-            secret:
+          secret:
             secretName: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
             items:
-                - key: KEYFILE_CONTENT
+              - key: KEYFILE_CONTENT
                 path: keyfile
             defaultMode: 0400
