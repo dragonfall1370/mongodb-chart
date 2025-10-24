@@ -93,36 +93,6 @@ spec:
           volumeMounts:
             - name: configdir
               mountPath: /data/configdb
-        {{- if .Values.replicaSet.autoInit }}
-        - name: rs-init
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          command: ["/bin/sh","-c"]
-          args:
-            - |
-              set -euo pipefail
-              # Only run on pod-0 to initialize the replicaset
-              if [ "$(hostname | awk -F- '{print $NF}')" != "0" ]; then
-                echo "Skipping rs.initiate on non-primary bootstrap pod"; exit 0; fi
-
-              # Wait for mongod to be ready in the background container (same pod)
-              RETRIES={{ .Values.init.maxRetries }}
-              until mongo --quiet --eval 'db.adminCommand("ping")' || mongosh --quiet --eval 'db.adminCommand("ping")'; do
-                echo "Waiting for mongod..."; sleep {{ .Values.init.waitPrimarySeconds }}; RETRIES=$((RETRIES-1));
-                if [ "$RETRIES" -le 0 ]; then echo "mongod not ready"; exit 1; fi
-              done
-
-              # Build members list from StatefulSet DNS
-              RS='{"_id":"{{ .Values.replicaSet.name }}","members":[{"_id":0,"host":"{{ include "mongodb-chart.fullname" . }}-0.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"},{"_id":1,"host":"{{ include "mongodb-chart.fullname" . }}-1.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"},{"_id":2,"host":"{{ include "mongodb-chart.fullname" . }}-2.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"}]}'
-
-              echo "Initiating replicaset with: $RS"
-              (mongo --quiet --eval "rs.initiate($RS)" || mongosh --quiet --eval "rs.initiate($RS)") || true
-
-              # Reconfig attempts (idempotent)
-              (mongo --quiet --eval 'rs.status()' || mongosh --quiet --eval 'rs.status()')
-          volumeMounts:
-            - name: configdir
-              mountPath: /data/configdb
-        {{- end }}
       volumes:
         - name: configdir
           emptyDir: {}
