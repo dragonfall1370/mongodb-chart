@@ -1,0 +1,15 @@
+MongoDB ReplicaSet deployed.
+
+Namespace: {{ .Values.namespace }}
+Service:    {{ include "mongodb-chart.fullname" . }} ({{ .Values.service.type }})
+Headless:   {{ include "mongodb-chart.fullname" . }}-headless
+
+ReplicaSet: {{ .Values.replicaSet.name }} with {{ .Values.replicaCount }} pods
+
+Connection string (inside cluster):
+  mongodb://$(kubectl get pod -n {{ .Values.namespace }} -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "mongodb-chart.name" . }} -o jsonpath='{range .items[*]}{.metadata.name}{".{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"}{","}{end}' | sed 's/,$//')/?replicaSet={{ .Values.replicaSet.name }}
+
+If using LoadBalancer (MetalLB), connect to the EXTERNAL-IP shown by:
+  kubectl get svc {{ include "mongodb-chart.fullname" . }} -n {{ .Values.namespace }} -o wide
+
+NOTE: Exposing a DB via LoadBalancer is optional and may not always be recommended for production; clients usually connect using the per-pod DNS names via the headless service with the replicaSet parameter.

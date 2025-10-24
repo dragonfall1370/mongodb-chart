@@ -1,0 +1,18 @@
+{{- if .Values.headless.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mongodb-chart.fullname" . }}-headless
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "mongodb-chart.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: mongodb
+      port: {{ .Values.service.port }}
+      targetPort: 27017
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+{{- end }}

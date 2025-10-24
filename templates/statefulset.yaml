@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mongodb-chart.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "mongodb-chart.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "mongodb-chart.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+        app.kubernetes.io/component: database
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "mongodb-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mongodb
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["mongod"]
+          args:
+            - "--bind_ip_all"
+            - "--replSet={{ .Values.replicaSet.name }}"
+            - "--auth"
+            - "--keyFile=/data/configdb/keyfile"
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+                  key: MONGODB_ROOT_USER
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+                  key: MONGODB_ROOT_PASSWORD
+          volumeMounts:
+            - name: datadir
+              mountPath: /data/db
+            - name: configdir
+              mountPath: /data/configdb
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  mongo --quiet --eval 'db.adminCommand("ping")' || mongosh --quiet --eval 'db.adminCommand("ping")'
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+      initContainers:
+        - name: copy-keyfile
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -euo pipefail
+              umask 0077
+              KEYFILE_PATH="/data/configdb/keyfile"
+              if [ ! -f "$KEYFILE_PATH" ]; then
+                echo "$KEYFILE_CONTENT" > "$KEYFILE_PATH"
+                chown 999:999 "$KEYFILE_PATH"
+                chmod 400 "$KEYFILE_PATH"
+              fi
+          env:
+            - name: KEYFILE_CONTENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+                  key: KEYFILE_CONTENT
+          volumeMounts:
+            - name: configdir
+              mountPath: /data/configdb
+        {{- if .Values.replicaSet.autoInit }}
+        - name: rs-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -euo pipefail
+              # Only run on pod-0 to initialize the replicaset
+              if [ "$(hostname | awk -F- '{print $NF}')" != "0" ]; then
+                echo "Skipping rs.initiate on non-primary bootstrap pod"; exit 0; fi
+
+              # Wait for mongod to be ready in the background container (same pod)
+              RETRIES={{ .Values.init.maxRetries }}
+              until mongo --quiet --eval 'db.adminCommand("ping")' || mongosh --quiet --eval 'db.adminCommand("ping")'; do
+                echo "Waiting for mongod..."; sleep {{ .Values.init.waitPrimarySeconds }}; RETRIES=$((RETRIES-1));
+                if [ "$RETRIES" -le 0 ]; then echo "mongod not ready"; exit 1; fi
+              done
+
+              # Build members list from StatefulSet DNS
+              RS='{"_id":"{{ .Values.replicaSet.name }}","members":[{"_id":0,"host":"{{ include "mongodb-chart.fullname" . }}-0.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"},{"_id":1,"host":"{{ include "mongodb-chart.fullname" . }}-1.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"},{"_id":2,"host":"{{ include "mongodb-chart.fullname" . }}-2.{{ include "mongodb-chart.fullname" . }}-headless.{{ .Values.namespace }}.svc.cluster.local:27017"}]}'
+
+              echo "Initiating replicaset with: $RS"
+              (mongo --quiet --eval "rs.initiate($RS)" || mongosh --quiet --eval "rs.initiate($RS)") || true
+
+              # Reconfig attempts (idempotent)
+              (mongo --quiet --eval 'rs.status()' || mongosh --quiet --eval 'rs.status()')
+          volumeMounts:
+            - name: configdir
+              mountPath: /data/configdb
+        {{- end }}
+      volumes:
+        - name: configdir
+          emptyDir: {}
+      terminationGracePeriodSeconds: 30
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+      spec:
+        accessModes: {{ toYaml .Values.persistence.accessModes | nindent 10 }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}

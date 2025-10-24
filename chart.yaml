@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mongodb-chart
+description: Minimal MongoDB ReplicaSet (1 primary + 2 secondaries) with optional MetalLB LoadBalancer
+version: 0.1.0
+appVersion: "6.0"
+type: application
+keywords:
+  - mongodb
+  - replicaset
+  - database
+  - metallb

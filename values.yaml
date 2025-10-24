@@ -1,0 +1,81 @@
+# Global / release-scoped settings
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace management (Helm normally installs into -n <ns>)
+createNamespace: true
+namespace: mongodb
+
+image:
+  repository: mongo
+  tag: "6.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 3 # 1 primary + 2 secondaries
+replicaSet:
+  name: rs0
+  # If true, the chart will initialize the replicaset automatically on pod-0
+  autoInit: true
+
+service:
+  type: ClusterIP # Change to LoadBalancer to use MetalLB
+  port: 27017
+  annotations: {}
+  # For MetalLB (optional)
+  loadBalancerIP: "" # e.g. 192.168.178.150
+  metallbAddressPool: "" # e.g. default (annotation metallb.universe.tf/address-pool)
+
+# Headless Service for stable network IDs of pods
+headless:
+  enabled: true
+
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClassName: "" # set to your SC, or leave empty for default
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 1Gi
+  # requests:
+  #   cpu: 250m
+  #   memory: 512Mi
+
+podSecurityContext:
+  runAsUser: 999   # mongodb user in official image
+  runAsGroup: 999
+  fsGroup: 999
+securityContext:
+  allowPrivilegeEscalation: false
+
+nodeSelector:
+  tolerations: []
+  affinity: {}
+
+# Authentication & internal keyFile
+auth:
+  enabled: true
+  # Provide existing secret with keys: MONGODB_ROOT_USER, MONGODB_ROOT_PASSWORD, KEYFILE_CONTENT
+  existingSecret: ""
+  rootUser: "admin"
+  rootPassword: "changeMe123!"
+  # keyFile content must be 6–1024 chars, recommended random base64 (but store as plain here; chart encodes to file)
+  keyFile: "supersecretkeyfilecontent"
+
+init:
+  # Timeouts & retries for rs initiation
+  waitPrimarySeconds: 20
+  maxRetries: 30
+
+# Extra annotations/labels
+podAnnotations: {}
+podLabels: {}
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
