@@ -41,7 +41,6 @@ spec:
           command: ["/bin/sh","-c"]
           args:
             - |
-              set -euo pipefail
               # copy from secret -> writable emptyDir, then fix ownership & perms
               cp /secret/keyfile /work/keyfile
               chown 999:999 /work/keyfile
