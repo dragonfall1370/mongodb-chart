@@ -63,28 +63,25 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           readinessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  mongo --quiet --eval 'db.adminCommand("ping")' || mongosh --quiet --eval 'db.adminCommand("ping")'
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
+          exec:
+            command: ["/bin/sh","-c","mongo --quiet --eval 'db.adminCommand(\"ping\")' || mongosh --quiet --eval 'db.adminCommand(\"ping\")'"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
       initContainers:
           - name: prepare-keyfile
             image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
             command: ["/bin/sh","-c"]
             args:
-                - |
+            - |
                 set -euo pipefail
                 install -m 400 -o 999 -g 999 /secret/keyfile /work/keyfile
             volumeMounts:
-                - name: keyfile-secret
+            - name: keyfile-secret
                 mountPath: /secret
-                - name: keydir
+                readOnly: true
+            - name: keydir
                 mountPath: /work
       volumes:
         - name: configdir
@@ -93,10 +90,12 @@ spec:
         - name: datadir
           emptyDir: {}
         {{- end }}
-        - name: keyfile
+        - name: keyfile-secret
           secret:
             secretName: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
             items:
             - key: KEYFILE_CONTENT
               path: keyfile
             defaultMode: 0440
+        - name: keydir
+            emptyDir: {}
