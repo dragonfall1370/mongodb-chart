@@ -70,29 +70,29 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
-      initContainers:
-        - name: copy-keyfile
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          command: ["/bin/sh","-c"]
-          args:
-            - |
-              set -euo pipefail
-              umask 0077
-              KEYFILE_PATH="/data/configdb/keyfile"
-              if [ ! -f "$KEYFILE_PATH" ]; then
-                echo "$KEYFILE_CONTENT" > "$KEYFILE_PATH"
-                chown 999:999 "$KEYFILE_PATH"
-                chmod 400 "$KEYFILE_PATH"
-              fi
-          env:
-            - name: KEYFILE_CONTENT
-              valueFrom:
-                secretKeyRef:
-                  name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
-                  key: KEYFILE_CONTENT
-          volumeMounts:
-            - name: configdir
-              mountPath: /data/configdb
+    #   initContainers:
+    #     - name: copy-keyfile
+    #       image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    #       command: ["/bin/sh","-c"]
+    #       args:
+    #         - |
+    #           set -euo pipefail
+    #           umask 0077
+    #           KEYFILE_PATH="/data/configdb/keyfile"
+    #           if [ ! -f "$KEYFILE_PATH" ]; then
+    #             echo "$KEYFILE_CONTENT" > "$KEYFILE_PATH"
+    #             chown 999:999 "$KEYFILE_PATH"
+    #             chmod 400 "$KEYFILE_PATH"
+    #           fi
+    #       env:
+    #         - name: KEYFILE_CONTENT
+    #           valueFrom:
+    #             secretKeyRef:
+    #               name: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "mongodb-chart.fullname" . }}-auth{{ end }}
+    #               key: KEYFILE_CONTENT
+    #       volumeMounts:
+    #         - name: configdir
+    #           mountPath: /data/configdb
       volumes:
         - name: configdir
           emptyDir: {}
