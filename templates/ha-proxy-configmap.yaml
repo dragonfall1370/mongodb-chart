@@ -8,7 +8,7 @@ data:
     global
         log stdout format raw daemon
         maxconn 2048
-        # external checks need forking; this silences warnings in 3.x
+        # external checks fork a helper; silence warnings
         insecure-fork-wanted
 
     defaults
@@ -24,11 +24,12 @@ data:
     backend b_mongo
         mode tcp
         balance first
+        # enable external-checks for this backend
         option external-check
         external-check path /usr/local/bin
-        external-check command check_mongo_primary.sh %srv_addr %srv_port
+        external-check command check_mongo_primary.sh
 
-        # MongoDB pods behind the headless service
+        # Three MongoDB pods (headless service DNS)
         server mongo-0 mongo-mongodb-chart-0.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
         server mongo-1 mongo-mongodb-chart-1.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
         server mongo-2 mongo-mongodb-chart-2.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
