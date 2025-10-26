@@ -1,21 +1,26 @@
 #!/bin/sh
-# check_mongo_primary.sh
-set -eu
+# HAProxy 3.x external-check: host/port come from env, not argv
+# Falls back to argv for manual testing.
+HOST="${1:-${SRV_FQDN:-${SRV_ADDR}}}"
+PORT="${2:-${SRV_PORT:-27017}}"
 
-# HAProxy provides envs for the checked server:
-HOST="${HAPROXY_SERVER_ADDR:-127.0.0.1}"
-PORT="${HAPROXY_SERVER_PORT:-27017}"
-
-USER="${MONGO_USER:-}"
+USER="${MONGO_USER:-admin}"
 PASS="${MONGO_PASS:-}"
 AUTHDB="${MONGO_AUTH_DB:-admin}"
 
-# Don’t ever prompt; fail if creds missing
-[ -n "$USER" ] && [ -n "$PASS" ] || exit 2
+# Exit codes for HAProxy external-check:
+# 0 = OK (PRIMARY); 1 = reachable but NOT primary; 2 = error/unknown
+if [ -z "$HOST" ] || [ -z "$PORT" ]; then
+    exit 2
+fi
 
-# Use absolute path
-/usr/local/bin/mongosh --quiet \
-  --host "$HOST" --port "$PORT" \
-  -u "$USER" -p "$PASS" --authenticationDatabase "$AUTHDB" \
-  --eval 'const r = db.hello(); print(r.isWritablePrimary===true?"true":"false")' \
-| grep -q true
+/usr/bin/mongosh --norc --quiet \
+    "mongodb://${USER}:${PASS}@${HOST}:${PORT}/?authSource=${AUTHDB}&serverSelectionTimeoutMS=800&directConnection=true" \
+    --eval 'const h=db.hello(); quit(h && (h.isWritablePrimary===true || h.ismaster===true) ? 0 : 1)' \
+    >/dev/null 2>&1
+rc=$?
+
+# Normalize mongosh’s return:
+[ $rc -eq 0 ] && exit 0
+[ $rc -eq 1 ] && exit 1
+exit 2
