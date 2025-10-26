@@ -10,9 +10,6 @@ data:
     maxconn 2048
     external-check
     insecure-fork-wanted
-    setenv MONGO_USER admin
-    setenv MONGO_PASS Mondodbadmin123!
-    setenv MONGO_AUTH_DB admin
 
     defaults
         mode tcp
