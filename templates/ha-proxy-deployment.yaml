@@ -24,6 +24,19 @@ spec:
         - name: haproxy
           image: gdragonfall1370/ha-proxy:latest
           imagePullPolicy: Always
+          env:
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb-chart.fullname" . }}-auth
+                  key: MONGODB_ROOT_USER
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb-chart.fullname" . }}-auth
+                  key: MONGODB_ROOT_PASSWORD
+            - name: MONGO_AUTH_DB
+              value: "admin"
           ports:
             - name: mongo
               containerPort: 27017
