@@ -1,24 +1,26 @@
-# Dockerfile
+# haproxy with mongosh for external-check
 FROM haproxy:3.0
 
-# Become root for package install
+# get root to install tools
 USER root
 
-# Install mongosh (via MongoDB repo) + tools
+# install minimal tools (no MongoDB apt repo needed)
 RUN apt-get update && \
-    apt-get install -y curl gnupg ca-certificates && \
-    curl -fsSL https://pgp.mongodb.com/server-6.0.asc \
-      | gpg --dearmor -o /usr/share/keyrings/mongodb-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/mongodb-archive-keyring.gpg] \
-      https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" \
-      > /etc/apt/sources.list.d/mongodb-org-6.0.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends mongodb-mongosh && \
+    apt-get install -y --no-install-recommends curl ca-certificates tar gzip grep && \
     rm -rf /var/lib/apt/lists/*
 
-# Health-check script for HAProxy external-check
+# fetch mongosh (x64), unpack, and place the binary on PATH
+ARG MONGOSH_VERSION=2.5.8
+RUN set -eux; \
+    curl -L -o /tmp/mongosh.tgz "https://downloads.mongodb.com/compass/mongosh-${MONGOSH_VERSION}-linux-x64.tgz"; \
+    mkdir -p /opt/mongosh && tar -xzf /tmp/mongosh.tgz -C /opt/mongosh --strip-components=1; \
+    mv /opt/mongosh/bin/mongosh /usr/local/bin/mongosh; \
+    chmod +x /usr/local/bin/mongosh; \
+    rm -rf /tmp/mongosh.tgz /opt/mongosh
+
+# your external-check script
 COPY check_mongo_primary.sh /usr/local/bin/check_mongo_primary.sh
 RUN chmod +x /usr/local/bin/check_mongo_primary.sh
 
-# Drop back to the default non-root user provided by the image
+# drop back to haproxy default user
 USER haproxy
