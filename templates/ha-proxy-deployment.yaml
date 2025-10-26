@@ -23,7 +23,7 @@ spec:
       containers:
         - name: haproxy
           image: gdragonfall1370/ha-proxy:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: mongo
               containerPort: 27017
