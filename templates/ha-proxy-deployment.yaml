@@ -4,15 +4,16 @@ metadata:
   name: haproxy-mongo
   namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/name: haproxy-mongo
-    app.kubernetes.io/instance: mongo
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+    app.kubernetes.io/component: haproxy
 spec:
   replicas: 2
   selector:
     matchLabels:
-        app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
-        app.kubernetes.io/component: haproxy
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+      app.kubernetes.io/component: haproxy
   template:
     metadata:
       labels:
@@ -23,7 +24,10 @@ spec:
       containers:
         - name: haproxy
           image: gdragonfall1370/ha-proxy:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mongo
+              containerPort: 27017
           env:
             - name: MONGO_USER
               valueFrom:
@@ -37,13 +41,9 @@ spec:
                   key: MONGODB_ROOT_PASSWORD
             - name: MONGO_AUTH_DB
               value: "admin"
-          ports:
-            - name: mongo
-              containerPort: 27017
           volumeMounts:
             - name: haproxy-config
-              mountPath: /usr/local/etc/haproxy/haproxy.cfg
-              subPath: haproxy.cfg
+              mountPath: /usr/local/etc/haproxy
           readinessProbe:
             tcpSocket:
               port: 27017

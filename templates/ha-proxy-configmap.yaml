@@ -4,13 +4,17 @@ metadata:
   name: haproxy-mongo-cm
   namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/name: haproxy-mongo
-    app.kubernetes.io/instance: mongo
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+    app.kubernetes.io/component: haproxy
 data:
   haproxy.cfg: |
     global
         log stdout format raw daemon
         maxconn 2048
+        # Required for external-check
+        external-check
+        insecure-fork-wanted
 
     defaults
         mode tcp
@@ -26,12 +30,12 @@ data:
         mode tcp
         balance first
 
-        # Enable external checks for all servers in this backend
+        # External primary check –  calls /usr/local/bin/check_mongo_primary.sh <host> <port>
         option external-check
         external-check path /usr/local/bin
         external-check command check_mongo_primary.sh
 
-        # Normal TCP health-check + external-check (no 'external-check' token here)
-        server mongo-0 mongo-mongodb-chart-0.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
-        server mongo-1 mongo-mongodb-chart-1.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
-        server mongo-2 mongo-mongodb-chart-2.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1
+        # Three RS members behind the headless service
+        server mongo-0 mongo-mongodb-chart-0.mongo-mongodb-chart-headless.{{ .Values.namespace }}.svc.cluster.local:27017 check inter 2s fall 2 rise 1
+        server mongo-1 mongo-mongodb-chart-1.mongo-mongodb-chart-headless.{{ .Values.namespace }}.svc.cluster.local:27017 check inter 2s fall 2 rise 1
+        server mongo-2 mongo-mongodb-chart-2.mongo-mongodb-chart-headless.{{ .Values.namespace }}.svc.cluster.local:27017 check inter 2s fall 2 rise 1
