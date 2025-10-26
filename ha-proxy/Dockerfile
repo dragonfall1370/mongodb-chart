@@ -1,26 +1,30 @@
-# haproxy with mongosh for external-check
-FROM haproxy:3.0
+# haproxy with mongosh baked in
+FROM haproxy:3.0.12
 
-# get root to install tools
 USER root
 
-# install minimal tools (no MongoDB apt repo needed)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates tar gzip grep && \
-    rm -rf /var/lib/apt/lists/*
+# Tools + curl for download
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl tar grep \
+    && rm -rf /var/lib/apt/lists/*
 
-# fetch mongosh (x64), unpack, and place the binary on PATH
-ARG MONGOSH_VERSION=2.5.8
+# Install mongosh from tarball (no distro repo needed)
+ARG MONGOSH_VERSION=2.2.10
 RUN set -eux; \
-    curl -L -o /tmp/mongosh.tgz "https://downloads.mongodb.com/compass/mongosh-${MONGOSH_VERSION}-linux-x64.tgz"; \
-    mkdir -p /opt/mongosh && tar -xzf /tmp/mongosh.tgz -C /opt/mongosh --strip-components=1; \
-    mv /opt/mongosh/bin/mongosh /usr/local/bin/mongosh; \
-    chmod +x /usr/local/bin/mongosh; \
-    rm -rf /tmp/mongosh.tgz /opt/mongosh
+  arch="$(uname -m)"; \
+  case "$arch" in \
+    x86_64)  MONGO_ARCH="x64" ;; \
+    aarch64) MONGO_ARCH="arm64" ;; \
+    *) echo "Unsupported arch: $arch"; exit 1 ;; \
+  esac; \
+  curl -fsSL "https://downloads.mongodb.com/compass/mongosh-${MONGOSH_VERSION}-linux-${MONGO_ARCH}.tgz" -o /tmp/mongosh.tgz; \
+  mkdir -p /opt/mongosh; \
+  tar -xzf /tmp/mongosh.tgz -C /opt/mongosh --strip-components=1; \
+  ln -s /opt/mongosh/bin/mongosh /usr/local/bin/mongosh; \
+  rm -f /tmp/mongosh.tgz
 
-# your external-check script
+# Health-check script (absolute path to mongosh)
 COPY check_mongo_primary.sh /usr/local/bin/check_mongo_primary.sh
 RUN chmod +x /usr/local/bin/check_mongo_primary.sh
 
-# drop back to haproxy default user
 USER haproxy
