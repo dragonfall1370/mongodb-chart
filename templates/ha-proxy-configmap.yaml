@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-mongo-cm
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: haproxy-mongo
+    app.kubernetes.io/instance: mongo
+data:
+  haproxy.cfg: |
+    global
+        log stdout format raw daemon
+        maxconn 2048
+
+    defaults
+        mode tcp
+        timeout connect 5s
+        timeout client  1m
+        timeout server  1m
+        option external-check
+        external-check path "/usr/local/bin"
+        external-check command "check_mongo_primary.sh"
+
+    frontend f_mongo
+        bind *:27017
+        default_backend b_mongo
+
+    backend b_mongo
+        option tcp-check
+        balance first
+        server mongo-0 mongo-mongodb-chart-0.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1 external-check
+        server mongo-1 mongo-mongodb-chart-1.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1 external-check
+        server mongo-2 mongo-mongodb-chart-2.mongo-mongodb-chart-headless.mongodb.svc.cluster.local:27017 check inter 2s fall 2 rise 1 external-check

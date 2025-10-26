@@ -24,3 +24,4 @@ spec:
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ include "mongodb-chart.name" . }}
+    app.kubernetes.io/component: haproxy
