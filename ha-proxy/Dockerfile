@@ -3,9 +3,11 @@ FROM haproxy:3.0.12
 
 USER root
 
-# Tools + curl for download
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install base tools (vim, nano, curl, tar, grep, certs)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
       ca-certificates curl tar grep \
+      vim nano \
     && rm -rf /var/lib/apt/lists/*
 
 # Install mongosh from tarball (no distro repo needed)
@@ -23,7 +25,7 @@ RUN set -eux; \
   ln -s /opt/mongosh/bin/mongosh /usr/local/bin/mongosh; \
   rm -f /tmp/mongosh.tgz
 
-# Health-check script (absolute path to mongosh)
+# Add external-check script
 COPY check_mongo_primary.sh /usr/local/bin/check_mongo_primary.sh
 RUN chmod +x /usr/local/bin/check_mongo_primary.sh
 
