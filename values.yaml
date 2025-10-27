@@ -8,7 +8,7 @@ namespace: mongodb
 
 image:
   repository: mongo
-  tag: "6.0"
+  tag: "8.0"
   pullPolicy: IfNotPresent
 
 replicaCount: 3 # 1 primary + 2 secondaries
