@@ -1,40 +1,41 @@
 #!/bin/sh
-# Exit codes for HAProxy external-check:
 # 0 => PRIMARY, 1 => reachable but NOT primary, 2 => error/unknown
+set -eu
 
-# Make sure common bin paths are available
-PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Expect HAProxy 3.x to set the server name (mongo-0|mongo-1|mongo-2)
+SNAME="${HAPROXY_SERVER_NAME:-}"
 
-# HAProxy 3.x sets these for the checked server; fall back to older names or argv for manual tests
-HOST="${1:-${HAPROXY_SERVER_ADDR:-${HAPROXY_SERVER_FQDN:-${SRV_ADDR:-${SRV_FQDN:-}}}}}"
-PORT="${2:-${HAPROXY_SERVER_PORT:-${SRV_PORT:-27017}}}"
+# Parse index from SNAME and build the correct pod FQDN:
+#   mongo-mongodb-chart-<idx>.mongo-mongodb-chart-headless.mongodb.svc.cluster.local
+case "$SNAME" in
+  mongo-0) IDX=0 ;;
+  mongo-1) IDX=1 ;;
+  mongo-2) IDX=2 ;;
+  *) exit 2 ;;
+esac
 
-# Optional auth (if your cluster requires it for hello); otherwise leave empty
+HEADLESS="mongo-mongodb-chart-headless"
+NAMESPACE="mongodb"
+PORT="27017"
+HOST="mongo-mongodb-chart-${IDX}.${HEADLESS}.${NAMESPACE}.svc.cluster.local"
+
+# Optional auth (used only if provided)
 USER="${MONGO_USER:-}"
 PASS="${MONGO_PASS:-}"
 AUTHDB="${MONGO_AUTH_DB:-admin}"
 
-# Require host/port
-[ -z "$HOST" ] || [ -z "$PORT" ] && exit 2
+URI="mongodb://${HOST}:${PORT}/?directConnection=true&serverSelectionTimeoutMS=800"
 
-# Build mongosh args
-ARGS="--norc --quiet --host $HOST --port $PORT --eval"
-JS='const h = db.hello();
-    quit(h && (h.isWritablePrimary === true || h.ismaster === true) ? 0 : 1);'
-
-# Add credentials if provided
 if [ -n "$USER" ]; then
-  ARGS="$ARGS -u $USER -p $PASS --authenticationDatabase $AUTHDB"
+  mongosh --norc --quiet "$URI&authSource=${AUTHDB}" \
+    -u "$USER" -p "$PASS" \
+    --eval 'const h=db.hello(); quit(h && (h.isWritablePrimary===true || h.ismaster===true) ? 0 : 1)' \
+    >/dev/null 2>&1
+else
+  mongosh --norc --quiet "$URI" \
+    --eval 'const h=db.hello(); quit(h && (h.isWritablePrimary===true || h.ismaster===true) ? 0 : 1)' \
+    >/dev/null 2>&1
 fi
-
-# Run; suppress output, interpret rc as HAProxy expects
-# Use directConnection and a short selection timeout to avoid long hangs
-mongosh $ARGS \
-  'const h = db.hello();
-   quit(h && (h.isWritablePrimary === true || h.ismaster === true) ? 0 : 1);' \
-  --eval '/* no-op */' \
-  --quiet \
-  >/dev/null 2>&1
 
 rc=$?
 [ "$rc" -eq 0 ] && exit 0
